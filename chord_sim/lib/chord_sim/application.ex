@@ -9,7 +9,6 @@ defmodule ChordSim.Application do
   def start(_type, _args) do
     children = [
       ChordSimWeb.Telemetry,
-      ChordSim.Repo,
       {DNSCluster, query: Application.get_env(:chord_sim, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: ChordSim.PubSub},
       # Start a worker by calling: ChordSim.Worker.start_link(arg)
