@@ -12,11 +12,14 @@
   def join(id, known_id \\ nil), do: GenServer.call(via(id), {:join, known_id})
   def find_successor(id, key), do: GenServer.call(via(id), {:find_successor, key})
   def notify(id, candidate_id), do: GenServer.call(via(id), {:notify, candidate_id})
+  def get_predecessor(id), do: GenServer.call(via(id), :get_predecessor)
+  def stabilize(id), do: GenServer.cast(via(id), :stabilize)
 
   ## Callbacks
   @impl true
   def init(id) do
     state = %{id: id, successor: id, predecessor: nil}
+    Process.send_after(self(), :stabilize, 1_000)
     {:ok, state}
   end
 
@@ -58,6 +61,35 @@
       end
 
     {:reply, :ok, new_state}
+  end
+
+  def handle_call(:get_predecessor, _from, state) do
+    {:reply, state.predecessor, state}
+  end
+
+  @impl true
+  def handle_cast(:stabilize, state) do
+    pred =
+      case GenServer.call(via(state.successor), :get_predecessor) do
+        nil -> nil
+        value -> value
+      end
+
+    new_state =
+      cond do
+        pred == nil ->
+          state
+
+        in_interval?(pred, state.id, state.successor) ->
+          %{state | successor: pred}
+
+        true ->
+          state
+      end
+
+    GenServer.call(via(new_state.successor), {:notify, new_state.id})
+    Process.send_after(self(), :stabilize, 1_000)
+    {:noreply, new_state}
   end
 
   defp in_interval?(key, start_id, end_id) do
