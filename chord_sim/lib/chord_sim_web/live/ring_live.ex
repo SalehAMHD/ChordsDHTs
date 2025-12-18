@@ -41,8 +41,8 @@ defmodule ChordSimWeb.RingLive do
               :ok = ChordSim.Node.join(id, known)
               assign(socket, notice: "Node #{id} joined")
 
-            {:error, _} ->
-              assign(socket, notice: "Failed to start node #{id}")
+            {:error, reason} ->
+              assign(socket, notice: "Failed to start node #{id}: #{inspect(reason)}")
           end
       end
 
@@ -93,10 +93,17 @@ defmodule ChordSimWeb.RingLive do
           assign(socket, notice: "Key and value are required")
 
         true ->
-          :ok = ChordSim.Node.put(entry_id, key, value)
-          key_id = ChordSim.Node.hash_id(key)
-          {:ok, owner} = ChordSim.Node.find_successor(entry_id, key_id)
-          assign(socket, notice: "Stored on node #{owner} (key id #{key_id})")
+          notice =
+            try do
+              :ok = ChordSim.Node.put(entry_id, key, value)
+              key_id = ChordSim.Node.hash_id(key)
+              {:ok, owner} = ChordSim.Node.find_successor(entry_id, key_id)
+              "Stored on node #{owner} (key id #{key_id})"
+            catch
+              _, err -> "Put failed: #{inspect(err)}"
+            end
+
+          assign(socket, notice: notice)
       end
 
     {:noreply, load_state(socket)}
@@ -115,16 +122,23 @@ defmodule ChordSimWeb.RingLive do
           assign(socket, notice: "Key is required")
 
         true ->
-          key_id = ChordSim.Node.hash_id(key)
-          {:ok, owner} = ChordSim.Node.find_successor(entry_id, key_id)
+          notice =
+            try do
+              key_id = ChordSim.Node.hash_id(key)
+              {:ok, owner} = ChordSim.Node.find_successor(entry_id, key_id)
 
-          case ChordSim.Node.get(entry_id, key) do
-            {:ok, value} ->
-              assign(socket, notice: "Found #{inspect(value)} on node #{owner}")
+              case ChordSim.Node.get(entry_id, key) do
+                {:ok, value} ->
+                  "Found #{inspect(value)} on node #{owner}"
 
-            :not_found ->
-              assign(socket, notice: "Not found (responsible node #{owner})")
-          end
+                :not_found ->
+                  "Not found (responsible node #{owner})"
+              end
+            catch
+              _, err -> "Get failed: #{inspect(err)}"
+            end
+
+          assign(socket, notice: notice)
       end
 
     {:noreply, load_state(socket)}
@@ -198,6 +212,9 @@ defmodule ChordSimWeb.RingLive do
                 phx-value-id={node.id}
               >
                 <span><%= node.id %></span>
+                <%= if node.count && node.count > 0 do %>
+                  <span class="node-count"><%= node.count %></span>
+                <% end %>
               </button>
             <% end %>
           </div>
@@ -333,16 +350,21 @@ defmodule ChordSimWeb.RingLive do
     node_info = build_node_info(nodes)
     selected_info = Map.get(node_info, selected_id)
     selected_keys = if selected_id, do: safe_dump(selected_id), else: []
+    ring_size = socket.assigns.ring_size
 
     ring_points =
       if nodes == [] do
         []
       else
-        nodes
-        |> Enum.with_index()
-        |> Enum.map(fn {id, idx} ->
-          angle = 2 * :math.pi() * idx / max(nodes_count, 1)
-          %{id: id, x: 50 + 38 * :math.cos(angle), y: 50 + 38 * :math.sin(angle)}
+        Enum.map(nodes, fn id ->
+          info = Map.get(node_info, id)
+          angle = 2 * :math.pi() * id / max(ring_size, 1)
+          %{
+            id: id,
+            x: 50 + 38 * :math.cos(angle),
+            y: 50 + 38 * :math.sin(angle),
+            count: if(info, do: info.key_count, else: 0)
+          }
         end)
       end
 
@@ -359,19 +381,27 @@ defmodule ChordSimWeb.RingLive do
   end
 
   defp list_nodes do
-    ChordSim.NodeSupervisor
-    |> DynamicSupervisor.which_children()
-    |> Enum.reduce([], fn
-      {_child_id, pid, :worker, _modules}, acc when is_pid(pid) ->
-        case :sys.get_state(pid) do
-          %{id: id} -> [id | acc]
-          _ -> acc
-        end
+    ids_from_registry =
+      Registry.select(ChordSim.NodeRegistry, [{{:"$1", :_, :_}, [], [:"$1"]}])
+      |> Enum.sort()
 
-      _, acc ->
-        acc
-    end)
-    |> Enum.sort()
+    if ids_from_registry != [] do
+      ids_from_registry
+    else
+      ChordSim.NodeSupervisor
+      |> DynamicSupervisor.which_children()
+      |> Enum.reduce([], fn
+        {_child_id, pid, :worker, _modules}, acc when is_pid(pid) ->
+          case :sys.get_state(pid) do
+            %{id: id} -> [id | acc]
+            _ -> acc
+          end
+
+        _, acc ->
+          acc
+      end)
+      |> Enum.sort()
+    end
   end
 
   defp build_node_info(nodes) do
@@ -419,11 +449,17 @@ defmodule ChordSimWeb.RingLive do
 
   defp next_available_id(nodes) do
     ring = ChordSim.Node.ring_size()
-    start = if nodes == [], do: 1, else: Enum.max(nodes) + 1
 
-    Enum.find(0..(ring - 1), fn offset ->
-      id = rem(start + offset, ring)
-      id not in nodes
-    end)
+    # try random picks to spread nodes on the ring
+    random_pick =
+      Enum.find_value(1..50, fn _ ->
+        id = :rand.uniform(ring - 1)
+        if id not in nodes, do: id, else: nil
+      end)
+
+    random_pick ||
+      Enum.find(1..(ring - 1), fn id ->
+        id not in nodes
+      end)
   end
 end

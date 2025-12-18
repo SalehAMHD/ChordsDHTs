@@ -16,6 +16,18 @@ defmodule ChordSim.Node do
   # Name a node by id via the Registry.
   def via(id), do: {:via, Registry, {ChordSim.NodeRegistry, id}}
 
+  # Child spec with a unique id per node (for DynamicSupervisor).
+  def child_spec(opts) do
+    id = Keyword.fetch!(opts, :id)
+
+    %{
+      id: {:chord_node, id},
+      start: {__MODULE__, :start_link, [opts]},
+      restart: :transient,
+      type: :worker
+    }
+  end
+
   # Return the number of bits in the identifier space.
   def m, do: @m
 
@@ -90,10 +102,18 @@ defmodule ChordSim.Node do
 
   # Join via a known node and pick its successor.
   def handle_call({:join, known_id}, _from, state) do
-    {:ok, succ} = GenServer.call(via(known_id), {:find_successor, state.id})
-    moved = GenServer.call(via(succ), {:transfer_keys, state.id})
-    Enum.each(moved, fn {key_id, value} -> :ets.insert(state.table, {key_id, value}) end)
-    GenServer.call(via(succ), {:notify, state.id})
+    {:ok, found} = GenServer.call(via(known_id), {:find_successor, state.id})
+    succ =
+      cond do
+        found == state.id and known_id != nil -> known_id
+        true -> found
+      end
+
+    if succ != state.id do
+      moved = GenServer.call(via(succ), {:transfer_keys, state.id})
+      Enum.each(moved, fn {key_id, value} -> :ets.insert(state.table, {key_id, value}) end)
+      GenServer.call(via(succ), {:notify, state.id})
+    end
 
     new_state = %{state | successor: succ, predecessor: nil}
     {:reply, :ok, set_finger(new_state, 1, succ)}
@@ -252,6 +272,16 @@ defmodule ChordSim.Node do
 
   # Stabilize: verify links with successor and notify it.
   defp do_stabilize(state) do
+    state =
+      if state.successor == state.id do
+        case fallback_successor(state.id) do
+          nil -> state
+          succ -> %{state | successor: succ}
+        end
+      else
+        state
+      end
+
     pred =
       if state.successor == state.id do
         nil
@@ -344,7 +374,10 @@ defmodule ChordSim.Node do
   defp find_successor_from_state(state, key_id) do
     cond do
       state.successor == state.id ->
-        {:ok, state.id}
+        case fallback_successor(state.id) do
+          nil -> {:ok, state.id}
+          succ -> {:ok, succ}
+        end
 
       in_interval?(key_id, state.id, state.successor) ->
         {:ok, state.successor}
@@ -352,10 +385,18 @@ defmodule ChordSim.Node do
       true ->
         next = closest_preceding_node(state, key_id)
 
-        if next == state.id do
-          {:ok, state.successor}
-        else
-          GenServer.call(via(next), {:find_successor, key_id})
+        cond do
+          next == state.id and state.successor != state.id ->
+            {:ok, state.successor}
+
+          next == state.id ->
+            case fallback_successor(state.id) do
+              nil -> {:ok, state.id}
+              succ -> {:ok, succ}
+            end
+
+          true ->
+            GenServer.call(via(next), {:find_successor, key_id})
         end
     end
   end
@@ -402,5 +443,17 @@ defmodule ChordSim.Node do
       true -> true
     end
   end
-end
 
+  # Find any other node id alive (used as fallback when successor=self).
+  defp fallback_successor(self_id) do
+    ids =
+      Registry.select(ChordSim.NodeRegistry, [{{:"$1", :_, :_}, [], [:"$1"]}])
+      |> Enum.reject(&(&1 == self_id))
+      |> Enum.sort()
+
+    case ids do
+      [] -> nil
+      _ -> Enum.find(ids, fn id -> id > self_id end) || hd(ids)
+    end
+  end
+end

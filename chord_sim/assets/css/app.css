@@ -105,15 +105,15 @@
 /* This file is for your main application CSS */
 
 :root {
-  --chord-ink: #1b1b1d;
-  --chord-ink-soft: #3a3a42;
-  --chord-bg: #f6f2e8;
-  --chord-bg-2: #e8f2f1;
-  --chord-panel: rgba(255, 255, 255, 0.78);
-  --chord-border: rgba(23, 23, 31, 0.12);
-  --chord-accent: #e26d2d;
-  --chord-accent-2: #2a7f74;
-  --chord-shadow: 0 20px 50px rgba(17, 22, 28, 0.12);
+  --chord-ink: #f4f2ff;
+  --chord-ink-soft: #c7c8e0;
+  --chord-bg: #0b1021;
+  --chord-bg-2: #151b34;
+  --chord-panel: rgba(18, 24, 46, 0.9);
+  --chord-border: rgba(244, 242, 255, 0.12);
+  --chord-accent: #ff8d3a;
+  --chord-accent-2: #5ae2b1;
+  --chord-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
   --chord-font: "Bahnschrift", "Segoe UI", sans-serif;
   --chord-mono: "Cascadia Mono", "Consolas", monospace;
 }
@@ -124,9 +124,10 @@
   color: var(--chord-ink);
   font-family: var(--chord-font);
   background:
-    radial-gradient(circle at 12% 10%, rgba(226, 109, 45, 0.14), transparent 40%),
-    radial-gradient(circle at 85% 20%, rgba(42, 127, 116, 0.18), transparent 45%),
-    linear-gradient(140deg, var(--chord-bg), var(--chord-bg-2));
+    radial-gradient(circle at 15% 15%, rgba(255, 141, 58, 0.12), transparent 40%),
+    radial-gradient(circle at 80% 10%, rgba(90, 226, 177, 0.16), transparent 45%),
+    radial-gradient(circle at 70% 80%, rgba(255, 141, 58, 0.12), transparent 45%),
+    linear-gradient(160deg, var(--chord-bg), var(--chord-bg-2));
 }
 
 .chord-hero {
@@ -235,8 +236,8 @@
   border-radius: 10px;
   border: 1px solid var(--chord-border);
   background: #fff;
-  color: var(--chord-ink);
-  font-weight: 600;
+  color: #0b1021;
+  font-weight: 700;
 }
 
 .chord-notice {
@@ -294,24 +295,44 @@
 .node-dot {
   position: absolute;
   transform: translate(-50%, -50%);
-  border: none;
-  background: #fff;
-  color: var(--chord-ink);
+  border: 1px solid var(--chord-border);
+  background: #0f1733;
+  color: #ffffff;
   width: 48px;
   height: 48px;
   border-radius: 50%;
   font-weight: 700;
   font-size: 13px;
-  box-shadow: 0 10px 20px rgba(23, 23, 31, 0.2);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.35);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
   cursor: pointer;
   animation: float-in 0.5s ease both;
   animation-delay: var(--delay, 0ms);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .node-dot.is-selected {
+  background: var(--chord-accent);
+  color: #0b1021;
+  box-shadow: 0 10px 24px rgba(255, 141, 58, 0.35);
+  text-shadow: none;
+}
+
+.node-count {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  min-width: 22px;
+  min-height: 22px;
+  padding: 2px 6px;
+  border-radius: 999px;
   background: var(--chord-accent-2);
-  color: #fff;
-  box-shadow: 0 10px 24px rgba(42, 127, 116, 0.35);
+  color: #0b1021;
+  font-size: 11px;
+  font-weight: 800;
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.35);
 }
 
 .chord-form {
@@ -326,6 +347,11 @@
   border: 1px solid var(--chord-border);
   background: #fff;
   font-size: 14px;
+  color: #0b1021;
+}
+
+.chord-form input::placeholder {
+  color: #4a5164;
 }
 
 .detail-grid {
