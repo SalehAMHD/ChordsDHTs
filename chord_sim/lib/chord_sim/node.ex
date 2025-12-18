@@ -1,19 +1,19 @@
-defmodule ChordSim.Node do
+﻿defmodule ChordSim.Node do
   use GenServer
   import Bitwise
 
-  @m 8
+  @m 16
   @stabilize_ms 1_000
   @check_pred_ms 2_000
   @fix_fingers_ms 1_500
 
-  # Start a node process with a fixed integer id.
+  # Lance un processus nœud avec un identifiant entier fixe
   def start_link(opts) when is_list(opts) do
     id = Keyword.fetch!(opts, :id)
     GenServer.start_link(__MODULE__, id, name: via(id))
   end
 
-  # Name a node by id via the Registry.
+  # Nommer le nœud via Horde.Registry pour qu’il soit joignable partout
   def via(id), do: {:via, Horde.Registry, {ChordSim.NodeRegistry, id}}
 
   # Child spec with a unique id per node (for DynamicSupervisor).
@@ -28,49 +28,49 @@ defmodule ChordSim.Node do
     }
   end
 
-  # Return the number of bits in the identifier space.
+  # Nombre de bits de l’espace d’identifiants
   def m, do: @m
 
-  # Return the ring size (2^m).
+  # Taille de l’anneau (2^m)
   def ring_size, do: 1 <<< @m
 
-  # Hash a user key into the identifier space.
+  # Hachage d’une clé utilisateur vers l’espace Chord
   def hash_id(key), do: hash_key(key)
 
-  # Join the ring; known_id is nil for the first node.
+  # Rejoindre l’anneau ; known_id = nil pour le tout premier nœud
   def join(id, known_id \\ nil), do: GenServer.call(via(id), {:join, known_id})
 
-  # Find the successor responsible for a key id.
+  # Trouver le successeur responsable d’un id
   def find_successor(id, key_id), do: GenServer.call(via(id), {:find_successor, key_id})
 
-  # Tell a node that we might be its predecessor.
+  # Prévenir un nœud qu’on est peut-être son prédécesseur
   def notify(id, candidate_id), do: GenServer.call(via(id), {:notify, candidate_id})
 
-  # Read the predecessor of a node.
+  # Lire le prédécesseur d’un nœud
   def get_predecessor(id), do: GenServer.call(via(id), :get_predecessor)
 
-  # Read basic info for UI/debug.
+  # Infos basiques pour l’UI / debug
   def info(id), do: GenServer.call(via(id), :info)
 
-  # Trigger periodic stabilization manually.
+  # Déclencher stabilize à la main
   def stabilize(id), do: GenServer.cast(via(id), :stabilize)
 
-  # Trigger predecessor check manually.
+  # Déclencher check_predecessor à la main
   def check_predecessor(id), do: GenServer.cast(via(id), :check_predecessor)
 
-  # Trigger finger updates manually.
+  # Déclencher fix_fingers à la main
   def fix_fingers(id), do: GenServer.cast(via(id), :fix_fingers)
 
-  # Store a key/value pair in the DHT (routed).
+  # Enregistrer une paire clé/valeur en la routant
   def put(id, key, value), do: GenServer.call(via(id), {:put, key, value})
 
-  # Fetch a value from the DHT (routed).
+  # Lire une valeur en la routant
   def get(id, key), do: GenServer.call(via(id), {:get, key})
 
-  # Show all local keys on a node (debug).
+  # Lister les clés locales (debug)
   def dump_keys(id), do: GenServer.call(via(id), :dump_keys)
 
-  # Leave the ring gracefully.
+  # Quitter l’anneau proprement
   def leave(id), do: GenServer.call(via(id), :leave)
 
   @impl true
