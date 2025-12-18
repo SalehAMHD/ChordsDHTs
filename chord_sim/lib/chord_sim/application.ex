@@ -10,9 +10,16 @@ defmodule ChordSim.Application do
     children = [
       ChordSimWeb.Telemetry,
       {DNSCluster, query: Application.get_env(:chord_sim, :dns_cluster_query) || :ignore},
+      {Cluster.Supervisor, [Application.get_env(:libcluster, :topologies, []), [name: ChordSim.ClusterSupervisor]]},
       {Phoenix.PubSub, name: ChordSim.PubSub},
-      {Registry, keys: :unique, name: ChordSim.NodeRegistry},
-      {DynamicSupervisor, strategy: :one_for_one, name: ChordSim.NodeSupervisor},
+      {Horde.Registry,
+       name: ChordSim.NodeRegistry,
+       keys: :unique,
+       members: :auto},
+      {Horde.DynamicSupervisor,
+       name: ChordSim.NodeSupervisor,
+       strategy: :one_for_one,
+       members: :auto},
       # Start a worker by calling: ChordSim.Worker.start_link(arg)
       # {ChordSim.Worker, arg},
       # Start to serve requests, typically the last entry

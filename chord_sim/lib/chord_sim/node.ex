@@ -14,7 +14,7 @@ defmodule ChordSim.Node do
   end
 
   # Name a node by id via the Registry.
-  def via(id), do: {:via, Registry, {ChordSim.NodeRegistry, id}}
+  def via(id), do: {:via, Horde.Registry, {ChordSim.NodeRegistry, id}}
 
   # Child spec with a unique id per node (for DynamicSupervisor).
   def child_spec(opts) do
@@ -447,7 +447,7 @@ defmodule ChordSim.Node do
   # Find any other node id alive (used as fallback when successor=self).
   defp fallback_successor(self_id) do
     ids =
-      Registry.select(ChordSim.NodeRegistry, [{{:"$1", :_, :_}, [], [:"$1"]}])
+      Horde.Registry.select(ChordSim.NodeRegistry, [{{:"$1", :_, :_}, [], [:"$1"]}])
       |> Enum.reject(&(&1 == self_id))
       |> Enum.sort()
 

@@ -1,0 +1,33 @@
+version: "3.9"
+services:
+  chord1:
+    build: .
+    environment:
+      - ERL_COOKIE=chordcookie
+      - RELEASE_DISTRIBUTION=sname
+      - RELEASE_NODE=chord1
+      - PHX_HOST=localhost
+      - PORT=4000
+      - PHX_SERVER=true
+      - SECRET_KEY_BASE=ytDLxE8yL5lPpWMxv1tUzVZayHFKYzSR4GXFmO+2YVhW/0M+uVg4j6k8xcpUi36R
+    ports:
+      - "4000:4000"
+    networks: [chordnet]
+
+  chord2:
+    build: .
+    environment:
+      - ERL_COOKIE=chordcookie
+      - RELEASE_DISTRIBUTION=sname
+      - RELEASE_NODE=chord2
+      - PHX_HOST=localhost
+      - PORT=4000
+      - PHX_SERVER=true
+      - SECRET_KEY_BASE=ytDLxE8yL5lPpWMxv1tUzVZayHFKYzSR4GXFmO+2YVhW/0M+uVg4j6k8xcpUi36R
+    ports:
+      - "4001:4000"
+    networks: [chordnet]
+
+networks:
+  chordnet:
+    driver: bridge

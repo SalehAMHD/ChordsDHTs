@@ -382,14 +382,14 @@ defmodule ChordSimWeb.RingLive do
 
   defp list_nodes do
     ids_from_registry =
-      Registry.select(ChordSim.NodeRegistry, [{{:"$1", :_, :_}, [], [:"$1"]}])
+      Horde.Registry.select(ChordSim.NodeRegistry, [{{:"$1", :_, :_}, [], [:"$1"]}])
       |> Enum.sort()
 
     if ids_from_registry != [] do
       ids_from_registry
     else
       ChordSim.NodeSupervisor
-      |> DynamicSupervisor.which_children()
+      |> Horde.DynamicSupervisor.which_children()
       |> Enum.reduce([], fn
         {_child_id, pid, :worker, _modules}, acc when is_pid(pid) ->
           case :sys.get_state(pid) do
