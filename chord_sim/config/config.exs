@@ -60,9 +60,19 @@ config :logger, :default_formatter,
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
 
-# Cluster topology (gossip for multi-node deployments)
+# Cluster topology: we support gossip by default and Epmd with an explicit host list
+# via the CHORD_NODES env var (comma-separated, e.g., "chord1@10.0.0.5,chord2@10.0.0.6").
+hosts =
+  System.get_env("CHORD_NODES", "")
+  |> String.split(",", trim: true)
+  |> Enum.map(&String.to_atom/1)
+
 config :libcluster,
   topologies: [
+    chord_epmd: [
+      strategy: Cluster.Strategy.Epmd,
+      config: [hosts: hosts]
+    ],
     chord_gossip: [
       strategy: Cluster.Strategy.Gossip
     ]

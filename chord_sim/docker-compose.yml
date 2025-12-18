@@ -2,30 +2,40 @@ version: "3.9"
 services:
   chord1:
     build: .
+    hostname: chord1.local
     environment:
       - ERL_COOKIE=chordcookie
-      - RELEASE_DISTRIBUTION=sname
-      - RELEASE_NODE=chord1
-      - PHX_HOST=localhost
+      - RELEASE_DISTRIBUTION=name
+      - RELEASE_NODE=chord1@chord1.local
+      - PHX_HOST=chord1.local
       - PORT=4000
       - PHX_SERVER=true
       - SECRET_KEY_BASE=ytDLxE8yL5lPpWMxv1tUzVZayHFKYzSR4GXFmO+2YVhW/0M+uVg4j6k8xcpUi36R
+      - ERL_DIST_PORT=9100
+      - CHORD_NODES=chord1@chord1.local,chord2@chord2.local
     ports:
       - "4000:4000"
+      - "4369:4369"
+      - "9100:9100"
     networks: [chordnet]
 
   chord2:
     build: .
+    hostname: chord2.local
     environment:
       - ERL_COOKIE=chordcookie
-      - RELEASE_DISTRIBUTION=sname
-      - RELEASE_NODE=chord2
-      - PHX_HOST=localhost
+      - RELEASE_DISTRIBUTION=name
+      - RELEASE_NODE=chord2@chord2.local
+      - PHX_HOST=chord2.local
       - PORT=4000
       - PHX_SERVER=true
       - SECRET_KEY_BASE=ytDLxE8yL5lPpWMxv1tUzVZayHFKYzSR4GXFmO+2YVhW/0M+uVg4j6k8xcpUi36R
+      - ERL_DIST_PORT=9100
+      - CHORD_NODES=chord1@chord1.local,chord2@chord2.local
     ports:
       - "4001:4000"
+      - "4369:4369"
+      - "9100:9100"
     networks: [chordnet]
 
 networks:
