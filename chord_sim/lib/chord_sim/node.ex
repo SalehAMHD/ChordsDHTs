@@ -7,16 +7,16 @@
   @check_pred_ms 2_000
   @fix_fingers_ms 1_500
 
-  # Lance un processus nœud avec un identifiant entier fixe
+  # Lance un procesus noeud avec un identifiant entier fixe
   def start_link(opts) when is_list(opts) do
     id = Keyword.fetch!(opts, :id)
     GenServer.start_link(__MODULE__, id, name: via(id))
   end
 
-  # Nommer le nœud via Horde.Registry pour qu’il soit joignable partout
+  # Nommer le noeud via Horde.Registry pour quil soit joignable partout
   def via(id), do: {:via, Horde.Registry, {ChordSim.NodeRegistry, id}}
 
-  # Child spec with a unique id per node (for DynamicSupervisor).
+  # Spec enfant avec un id unique par noeud pour le supervisor
   def child_spec(opts) do
     id = Keyword.fetch!(opts, :id)
 
@@ -28,53 +28,50 @@
     }
   end
 
-  # Nombre de bits de l’espace d’identifiants
+  # Nombre de bits de lespace didentifiants
   def m, do: @m
 
-  # Taille de l’anneau (2^m)
+  # Taille de lanneau (2^m)
   def ring_size, do: 1 <<< @m
 
-  # Hachage d’une clé utilisateur vers l’espace Chord
+  # Hachage dune cle utilisteur vers lespace Chord
   def hash_id(key), do: hash_key(key)
 
-  # Rejoindre l’anneau ; known_id = nil pour le tout premier nœud
+  # Rejoindre lanneau ; known_id = nil pour le tout premier noeud
   def join(id, known_id \\ nil), do: GenServer.call(via(id), {:join, known_id})
 
-  # Trouver le successeur responsable d’un id
+  # Trouver le successeur responsable dun id
   def find_successor(id, key_id), do: GenServer.call(via(id), {:find_successor, key_id})
 
-  # Prévenir un nœud qu’on est peut-être son prédécesseur
+  # Prevenir un noeud quon est peut etre son predecesseur
   def notify(id, candidate_id), do: GenServer.call(via(id), {:notify, candidate_id})
 
-  # Lire le prédécesseur d’un nœud
+  # Lire le predecesseur dun noeud
   def get_predecessor(id), do: GenServer.call(via(id), :get_predecessor)
 
-  # Infos basiques pour l’UI / debug
+  # Infos basiques pour lUI / debug
   def info(id), do: GenServer.call(via(id), :info)
 
-  # Déclencher stabilize à la main
+  # Declencher stabilize a la main
   def stabilize(id), do: GenServer.cast(via(id), :stabilize)
 
-  # Déclencher check_predecessor à la main
+  # Declencher check_predecessor a la main
   def check_predecessor(id), do: GenServer.cast(via(id), :check_predecessor)
 
-  # Déclencher fix_fingers à la main
+  # Declencher fix_fingers a la main
   def fix_fingers(id), do: GenServer.cast(via(id), :fix_fingers)
 
-  # Enregistrer une paire clé/valeur en la routant
+  # Enregistrer une paire cle/valeur en la routant
   def put(id, key, value), do: GenServer.call(via(id), {:put, key, value})
 
   # Lire une valeur en la routant
   def get(id, key), do: GenServer.call(via(id), {:get, key})
 
-  # Lister les clés locales (debug)
-  def dump_keys(id), do: GenServer.call(via(id), :dump_keys)
-
-  # Quitter l’anneau proprement
+  # Quitter lanneau proprement
   def leave(id), do: GenServer.call(via(id), :leave)
 
   @impl true
-  # Initialize node state and schedule periodic tasks.
+  # Init du noeud et on lance les timers
   def init(id) do
     table = :ets.new(String.to_atom("node_#{id}_table"), [:set, :protected, :named_table])
 
@@ -94,13 +91,13 @@
   end
 
   @impl true
-  # First node creates a ring with itself.
+  # Premier noeud creer son anneau tout seul
   def handle_call({:join, nil}, _from, state) do
     new_state = %{state | successor: state.id, predecessor: state.id}
     {:reply, :ok, set_finger(new_state, 1, new_state.successor)}
   end
 
-  # Join via a known node and pick its successor.
+  # Join en passant par un noeud connu et on prend son successeur
   def handle_call({:join, known_id}, _from, state) do
     {:ok, found} = GenServer.call(via(known_id), {:find_successor, state.id})
     succ =
@@ -120,13 +117,13 @@
   end
 
   @impl true
-  # Find successor; use fingers to skip ahead.
+  # Trouver le successeur en utilisant les fingers pour sauter
   def handle_call({:find_successor, key_id}, _from, state) do
     {:reply, find_successor_from_state(state, key_id), state}
   end
 
   @impl true
-  # Update predecessor if candidate is closer.
+  # Mettre a jour le predecesseur si le candidat est plus proche
   def handle_call({:notify, candidate_id}, _from, state) do
     new_state =
       cond do
@@ -144,13 +141,13 @@
   end
 
   @impl true
-  # Read predecessor id.
+  # Lire lid du predecesseur
   def handle_call(:get_predecessor, _from, state) do
     {:reply, state.predecessor, state}
   end
 
   @impl true
-  # Read basic info for UI/debug.
+  # Infos simples pour lUI et le debug
   def handle_call(:info, _from, state) do
     key_count = :ets.info(state.table, :size)
 
@@ -160,7 +157,7 @@
   end
 
   @impl true
-  # Route a DHT put to the responsible node.
+  # Router un put vers le bon noeud
   def handle_call({:put, key, value}, _from, state) do
     key_id = hash_key(key)
     {:ok, node_id} = find_successor_from_state(state, key_id)
@@ -169,7 +166,7 @@
   end
 
   @impl true
-  # Route a DHT get to the responsible node.
+  # Router un get vers le bon noeud
   def handle_call({:get, key}, _from, state) do
     key_id = hash_key(key)
     {:ok, node_id} = find_successor_from_state(state, key_id)
@@ -177,14 +174,14 @@
   end
 
   @impl true
-  # Store a key locally (no routing).
+  # Stocker localement sans router
   def handle_call({:store, key_id, value}, _from, state) do
     :ets.insert(state.table, {key_id, value})
     {:reply, :ok, state}
   end
 
   @impl true
-  # Fetch a key locally (no routing).
+  # Lire localement sans router
   def handle_call({:fetch, key_id}, _from, state) do
     case :ets.lookup(state.table, key_id) do
       [{^key_id, value}] -> {:reply, {:ok, value}, state}
@@ -193,13 +190,13 @@
   end
 
   @impl true
-  # Return local keys for debug.
+  # Retourner les cles locales pour debug
   def handle_call(:dump_keys, _from, state) do
     {:reply, :ets.tab2list(state.table), state}
   end
 
   @impl true
-  # Transfer keys that now belong to new_id.
+  # Transferer les cles qui appartiennent maintenant a new_id
   def handle_call({:transfer_keys, new_id}, _from, state) do
     pred = state.predecessor || state.id
 
@@ -214,20 +211,20 @@
   end
 
   @impl true
-  # Update successor pointer directly (used by leave).
+  # Mettre a jour le successeur direct (quand on leave)
   def handle_call({:set_successor, new_succ}, _from, state) do
     new_state = %{state | successor: new_succ}
     {:reply, :ok, set_finger(new_state, 1, new_succ)}
   end
 
   @impl true
-  # Update predecessor pointer directly (used by leave).
+  # Mettre a jour le predecesseur direct (quand on leave)
   def handle_call({:set_predecessor, new_pred}, _from, state) do
     {:reply, :ok, %{state | predecessor: new_pred}}
   end
 
   @impl true
-  # Graceful leave: move keys and reconnect neighbors.
+  # Leave propre: on bouge les cles et on recable les voisins
   def handle_call(:leave, _from, state) do
     if state.successor != state.id do
       Enum.each(:ets.tab2list(state.table), fn {key_id, value} ->
@@ -247,30 +244,30 @@
   end
 
   @impl true
-  # Manual stabilize trigger (same logic as timer).
+  # Stabilize manuel meme logique que le timer
   def handle_cast(:stabilize, state), do: do_stabilize(state)
 
   @impl true
-  # Manual predecessor check trigger (same logic as timer).
+  # Check_predecessor manuel meme logique que le timer
   def handle_cast(:check_predecessor, state), do: do_check_predecessor(state)
 
   @impl true
-  # Manual finger fix trigger (same logic as timer).
+  # Fix_fingers manuel meme logique que le timer
   def handle_cast(:fix_fingers, state), do: do_fix_fingers(state)
 
   @impl true
-  # Timer-driven stabilize trigger.
+  # Stabilize lance par le timer
   def handle_info(:stabilize, state), do: do_stabilize(state)
 
   @impl true
-  # Timer-driven predecessor check trigger.
+  # Check_predecessor lance par le timer
   def handle_info(:check_predecessor, state), do: do_check_predecessor(state)
 
   @impl true
-  # Timer-driven finger fix trigger.
+  # Fix_fingers lance par le timer
   def handle_info(:fix_fingers, state), do: do_fix_fingers(state)
 
-  # Stabilize: verify links with successor and notify it.
+  # Stabilize verifier les liens avec le successeur et le prevenir
   defp do_stabilize(state) do
     state =
       if state.successor == state.id do
@@ -309,7 +306,7 @@
     {:noreply, set_finger(new_state, 1, new_state.successor)}
   end
 
-  # Check that predecessor responds; drop it if not.
+  # Verifier que le predecesseur repond sinon on le vire
   defp do_check_predecessor(state) do
     new_state =
       case state.predecessor do
@@ -333,7 +330,7 @@
     {:noreply, new_state}
   end
 
-  # Update one finger at a time in round-robin.
+  # Mettre a jour un finger a la fois en boucle
   defp do_fix_fingers(state) do
     index = state.next_finger
     start = finger_start(state.id, index)
@@ -345,21 +342,21 @@
     {:noreply, %{new_state | next_finger: next_index}}
   end
 
-  # Build initial finger table (all point to self).
+  # Construire la finger table initiale (tout pointe sur soi)
   defp init_fingers(id) do
     for index <- 1..@m do
       %{start: finger_start(id, index), node: id}
     end
   end
 
-  # Update a single finger entry.
+  # Mettre a jour une entree de finger
   defp set_finger(state, index, node_id) do
     entry = %{start: finger_start(state.id, index), node: node_id}
     fingers = List.replace_at(state.fingers, index - 1, entry)
     %{state | fingers: fingers}
   end
 
-  # Choose the closest finger that precedes the key.
+  # Choisir le finger le plus proche qui precede la cle
   defp closest_preceding_node(state, key_id) do
     Enum.reduce_while(Enum.reverse(state.fingers), state.id, fn finger, acc ->
       if finger.node != nil and in_interval?(finger.node, state.id, key_id) do
@@ -370,7 +367,7 @@
     end)
   end
 
-  # Compute successor without sending a call to self.
+  # Trouver le successeur sans send un call a soi meme
   defp find_successor_from_state(state, key_id) do
     cond do
       state.successor == state.id ->
@@ -401,7 +398,7 @@
     end
   end
 
-  # Store locally if the target is self, otherwise route.
+  # Stocker local si la cible est soi sinon router
   defp route_store(state, node_id, key_id, value) do
     if node_id == state.id do
       :ets.insert(state.table, {key_id, value})
@@ -411,7 +408,7 @@
     end
   end
 
-  # Fetch locally if the target is self, otherwise route.
+  # Lire local si la cible est soi sinon router
   defp route_fetch(state, node_id, key_id) do
     if node_id == state.id do
       case :ets.lookup(state.table, key_id) do
@@ -423,19 +420,19 @@
     end
   end
 
-  # Compute the start of a finger interval.
+  # Calculer le debut dun intervalle de finger
   defp finger_start(id, index) do
     rem(id + (1 <<< (index - 1)), ring_size())
   end
 
-  # Hash a key into the identifier space using SHA-1.
+  # Hash dune cle dans lespace didentifiant avec SHA1
   defp hash_key(key) do
     data = :erlang.term_to_binary(key)
     <<hash::unsigned-32, _::binary>> = :crypto.hash(:sha, data)
     rem(hash, ring_size())
   end
 
-  # Check if key is in (start_id, end_id] on the ring.
+  # Savoir si la cle est dans (start_id, end_id] sur l anneau
   defp in_interval?(key_id, start_id, end_id) do
     cond do
       start_id < end_id -> key_id > start_id and key_id <= end_id
@@ -444,7 +441,7 @@
     end
   end
 
-  # Find any other node id alive (used as fallback when successor=self).
+  # Trouver un autre id de noeud vivant (fallback si successeur = soi)
   defp fallback_successor(self_id) do
     ids =
       Horde.Registry.select(ChordSim.NodeRegistry, [{{:"$1", :_, :_}, [], [:"$1"]}])

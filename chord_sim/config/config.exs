@@ -1,10 +1,3 @@
-# This file is responsible for configuring your application
-# and its dependencies with the aid of the Config module.
-#
-# This configuration file is loaded before any dependency and
-# is restricted to this project.
-
-# General application configuration
 import Config
 
 config :chord_sim,
@@ -22,16 +15,9 @@ config :chord_sim, ChordSimWeb.Endpoint,
   pubsub_server: ChordSim.PubSub,
   live_view: [signing_salt: "EDr8Y+Xz"]
 
-# Configure the mailer
-#
-# By default it uses the "Local" adapter which stores the emails
-# locally. You can see the emails in your browser, at "/dev/mailbox".
-#
-# For production it's recommended to configure a different adapter
-# at the `config/runtime.exs`.
 config :chord_sim, ChordSim.Mailer, adapter: Swoosh.Adapters.Local
 
-# Configure esbuild (the version is required)
+
 config :esbuild,
   version: "0.25.4",
   chord_sim: [
@@ -41,7 +27,7 @@ config :esbuild,
     env: %{"NODE_PATH" => [Path.expand("../deps", __DIR__), Mix.Project.build_path()]}
   ]
 
-# Configure tailwind (the version is required)
+# tailwind
 config :tailwind,
   version: "4.1.12",
   chord_sim: [
@@ -57,11 +43,10 @@ config :logger, :default_formatter,
   format: "$time $metadata[$level] $message\n",
   metadata: [:request_id]
 
-# Use Jason for JSON parsing in Phoenix
+
 config :phoenix, :json_library, Jason
 
-# Cluster topology: we support gossip by default and Epmd with an explicit host list
-# via the CHORD_NODES env var (comma-separated, e.g., "chord1@10.0.0.5,chord2@10.0.0.6").
+
 hosts =
   System.get_env("CHORD_NODES", "")
   |> String.split(",", trim: true)
@@ -78,6 +63,5 @@ config :libcluster,
     ]
   ]
 
-# Import environment specific config. This must remain at the bottom
-# of this file so it overrides the configuration defined above.
+
 import_config "#{config_env()}.exs"
